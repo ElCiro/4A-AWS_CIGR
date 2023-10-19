@@ -1,68 +1,208 @@
 <?php
-class ControladorFormularios{
-    /**
-     * Registro
-     */
-    static public function ctrRegistro(){
-        if (isset($_POST["registroNombre"])){
-            $tabla = "registros";
-            $datos = array( "nombre"=> $_POST["registroNombre"],
-            "email"=> $_POST["registroEmail"],
-            "password"=> $_POST["registroPassword"]);
+class ControladorFormularios
+{
+    /*
+    REGISTRO
+    */
+    static public function crtRegistro()
+    {
+        if (isset($_POST["registerName"])) {
+            /*return $_POST["registerName"] . "<br>" . $_POST["registerEmail"] . "<br>" .$_POST["registerPassword"] . "<br>";*/
+            if (
+                preg_match('/^[a-zA-ZáéíóúñÑ\s]+$/', $_POST["registerName"]) &&
+                preg_match('/^[^0-9][a-zA-Z0-9_]+([.][a-zA-Z0-9_]+)*[@][a-zA-Z0-9_]+([.][a-zA-Z0-9_]+)*[.][a-zA-Z]{2,4}$/', $_POST["registerEmail"]) &&
+                preg_match('/^[0-9a-zA-Z]+$/', $_POST["registerPassword"])
+            ) {
 
-            $respuesta = ModeloFormularios::mdlRegistro($tabla, $datos);
-           return $respuesta; 
+                $tabla = "registros";
+                $token = md5($_POST["registerName"] . "+" . $_POST["registerEmail"]);
+
+                //ENCRIPTAR CONTRASEÑA
+                $EncriptarPassword=crypt($_POST["registerPassword"],'$26$08$2004$ciroivanGRWe$');
+
+
+                $datos = array(
+                    "token" => $token,
+                    "nombre" => $_POST["registerName"],
+                    "email" => $_POST["registerEmail"],
+                    "password" => $EncriptarPassword
+                );
+
+                $respuesta = ModeloFormularios::mdlRegistro($tabla, $datos);
+                return $respuesta;
+            } else {
+
+                $respuesta = "error";
+                return $respuesta;
+            }
         }
     }
+    /**
+     * Selecion de registros de la tabla
+     */
+    static public function ctrSeleccionarRegistros($item, $valor)
+    {
+        if ($item == null && $valor == null) {
+            $tabla = "registros";
 
-    //tabla
+            $respuesta = ModeloFormularios::mdlSeleccionarRegistros($tabla, null, null);
 
-    static public function ctrSeleccionarRegistros($item,$valor){
-        $tabla = "registros";
+            return $respuesta;
+        } else {
+            $tabla = "registros";
 
-        $respuesta = ModeloFormularios::mdlSeleccionarRegistros( $tabla, $item, $valor);
+            $respuesta = ModeloFormularios::mdlSeleccionarRegistros($tabla, $item, $valor);
 
-        return $respuesta;
+            return $respuesta;
+        }
     }
-
-    //ingresar
-    public function ctrIngreso(){
-        if(isset($_POST["ingresoEmail"])){
+    /**
+     * Ingreso
+     */
+    public function ctrIngreso()
+    {
+        if (isset($_POST["ingresoEmail"])) {
             $tabla = "registros";
             $item = "email";
             $valor = $_POST["ingresoEmail"];
 
             $respuesta = ModeloFormularios::mdlSeleccionarRegistros($tabla, $item, $valor);
 
-           // echo "<pre>"; print_r($respuesta);
-           if(is_array($respuesta)){
-           if($respuesta["email"]== $_POST["ingresoEmail"] && $respuesta["password"] == $_POST["ingresoPassword"]){
+            $EncriptarPassword=crypt($_POST["ingresoPassword"],'$26$08$2004$ciroivanGRWe$');
 
-            $_SESSION["validarIngreso"] = "ok";
+            if (is_array($respuesta)) {
+                if ($respuesta["email"] == $_POST["ingresoEmail"] && $respuesta["password"] == $EncriptarPassword) {
+            //RECAPTCHA
+                ModeloFormularios::mdlActualizarIntentosFallidos($tabla,0,$respuesta["token"]);
 
-            echo '<script>
-            if(window.history.replaceState){
-                window.history.replaceState(null,null, window.location.href);
-            }
-            window.location = "index.php?pagina=inicio";
+                    $_SESSION["validarIngreso"] = "ok";
+
+                    echo '<div class="alert-success"> El usuario se ha registrado</div>';
+
+
+                    echo '<script>
+                        if (window.history.replaceState){
+                            window.history.replaceState(null, null, window.location.href);
+                        }
+                        setTimeout(function(){
+                            window.location.href = "index.php?pagina=inicio";
+                        }, 2000); 
+                    </script>';
+                } else {
+                    //RECAPTCHA
+                    if($respuesta["intentos_fallidos"]<3){
+                        $tabla="registros";
+                    $intentos_fallidos=$respuesta["intentos_fallidos"]+1;
+                
+                    $ActualizarIntentosFallidos=ModeloFormularios::mdlActualizarIntentosFallidos
+                    ($tabla,$intentos_fallidos,$respuesta["token"]);
+                    //echo'<pre>';print_r($intentos_fallidos);echo'</pre>';
+                    }else{
+                        echo '<div class="alert alert-warning">Verifica que no eres robot</div>';
+                    }
+
+
+                    echo '<script>
+                        if (window.history.replaceState){
+                            window.history.replaceState(null, null, window.location.href);
+                        }
+                    </script>';
+                    echo '<div class="alert alert-danger">Contraseña o email incorrectos</div>';
+                }
+            } else {
+                echo '<script>
+                    if (window.history.replaceState){
+                        window.history.replaceState(null, null, window.location.href);
+                    }
                 </script>';
-           }else{
-            echo '<script>
-            if(window.history.replaceState){
-            window.history.replaceState(null, null, window.location.href);
+                echo '<div class="alert alert-danger">Error! ';
             }
-            </script>';
-            echo '<div class="alert alert-danger"> Atras el usuario o email no existen tu contraseña no ha sido registrado</div>';
-           }
-        } else{
-            echo '<script>
-            if(window.history.replaceState){
-            window.history.replaceState(null, null, window.location.href);
-            }
-            </script>';
-            echo '<div class="alert alert-danger"> Atras no has sido registrado</div>'; 
         }
+    }
+
+    static public function ctrActualizarRegistro()
+    {
+        if (isset($_POST["ActualizarNombre"])) {
+            if (
+                preg_match('/^[a-zA-ZáéíóúñÑ]+$/',$_POST["ActualizarNombre"]) &&
+                preg_match('/^[^0-9][a-zA-Z0-9_]+([.][a-zA-Z0-9_]+)*[@][a-zA-Z0-9_]+([.][a-zA-Z0-9_]+)*[.][a-zA-Z]{2,4}$/', $_POST["updateEmail"])
+            ) {
+                $usuario = ModeloFormularios::mdlSeleccionarRegistros(
+                    "registros",
+                    "token",
+                    $_POST["tokenUsuario"]
+                );
+                $CompararToken = md5($usuario["nombre"] . "+" . $usuario["email"]);
+                if ($CompararToken == $_POST["tokenUsuario"]) {
+                    if ($_POST["updatePassword"] != "") {
+                        if(preg_match('/^[0-9a-zA-Z]+$/', $_POST["updatePassword"])){
+                            $password =crypt($_POST["updatePassword"],'$26$08$2004$ciroivanGRWe$');;
+                        }
+                    } else {
+                        $password = $_POST["passwordActual"];
+                    }
+
+                    //ACTAULIZAR TOKEN
+                    if ($_POST["nombreActual"] != $_POST["ActualizarNombre"] || $_POST["emailActual"] != $_POST["updateEmail"]) {
+                        $nuevoToken = md5($_POST["ActualizarNombre"] . "+" . $_POST["updateEmail"]);
+                    } else {
+                        $nuevoToken = null;
+                    }
+
+                    $tabla = "registros";
+
+                    $datos = array(
+                        "token" => $_POST["tokenUsuario"],
+                        "nuevoToken" => $nuevoToken, //viene un dato si se cambio el nombre o email y si no viene vacio
+                        "nombre" => $_POST["ActualizarNombre"],
+                        "email" => $_POST["updateEmail"],
+                        "password" => $password
+                    );
+
+                    $respuesta = ModeloFormularios::mdlActualizarRegistros($tabla, $datos);
+
+                    return $respuesta;
+                } else {
+                    $respuesta = "error";
+                    return  $respuesta;
+                }
+            }else{
+                $respuesta = "error";
+                return  $respuesta;
+            }
+        }
+    }
+    
+    public function ctrEliminarRegistro()
+    {
+        if (isset($_POST["deleteRegistro"])) {
+
+            $usuario = ModeloFormularios::mdlSeleccionarRegistros(
+                "registros",
+                "token",
+                $_POST["deleteRegistro"]
+            );
+
+            $CompararToken = md5($usuario["nombre"] . "+" . $usuario["email"]);
+            if ($CompararToken == $_POST["deleteRegistro"]) {
+                $tabla = "registros";
+                $valor = $_POST["deleteRegistro"];
+                $respuesta = ModeloFormularios::mdlEliminarRegistro($tabla, $valor);
+
+                if ($respuesta == "ok") {
+                    echo '<script>
+                    if (window.history.replaceState){
+                        window.history.replaceState(null, null, window.location.href);
+                    }
+                    </script>';
+                    echo '<div class="alert-success">Eliminaste el usuario</div>
+                        <script>
+                        setTimeout(function(){
+                        window.location = "index.php?pagina=inicio";
+                        },1500);
+                        </script>';
+                }
+            }
         }
     }
 }
-?>

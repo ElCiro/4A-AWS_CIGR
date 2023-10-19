@@ -11,3 +11,8 @@ READ
 UPDATE 
 DELETE 
 CRUD 
+
+#los ataques CSRF. se ejecutan cuando el atacante provoca que el usuario provoque una accion de una forma intencionada en una aplicacion en la que habia iniciado sesion.
+Cualquier accion que pueda realizar un usuario cuando esta logueado en un sitio web.
+Tambien lo podria hacer el atacante, ya sea actualizando su perfil, añadir objetos a la cesta, postear mensajes en un foro, etc.
+para esto debemos utilizar un token con un elemento encriptado.
